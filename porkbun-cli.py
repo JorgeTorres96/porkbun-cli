@@ -1,3 +1,4 @@
+# porkbun-cli.py
 #!/usr/bin/env python3
 
 '''
@@ -6,6 +7,7 @@ A command line tool for managing and updating your porkbun domains!
 
 Usage:
   porkbun-cli (-h | --help)
+  porkbun-cli list_all
   porkbun-cli show_ip
   porkbun-cli ping [options]
   porkbun-cli record list <domain>
@@ -30,6 +32,7 @@ from datetime import datetime
 
 import api
 
+ALLOWED_DNS_TYPES = {'A', 'AAAA', 'CNAME', 'MX', 'TXT', 'SRV', 'NS', 'ANAME', 'TLSA', 'CAA'}
 
 
 def rchop(s, suffix):
@@ -84,10 +87,15 @@ def record_list(secretapikey, apikey, domain):
 
 def record_create(secretapikey, apikey, domain, id, args):
     name = args['--name'] if args['--name'] is not None else ''
-    type = args['--type'] if args['--type'] is not None else 'A'
+    type = args['--type'].upper() if args['--type'] is not None else 'A'
     ttl = args['--ttl'] if args['--ttl'] is not None else '300'
     content = args['--content'] if args['--content'] is not None else get_external_ip()
     prio = args['--priority'] if args['--priority'] is not None else '0'
+
+    if type not in ALLOWED_DNS_TYPES:
+        print("Invalid DNS record type: {}. Allowed types are: {}".format(type, ', '.join(ALLOWED_DNS_TYPES)))
+        exit(1)
+
     print('Creating new record {}.{}'.format(name, domain))
     print(' - type: {}'.format(type))
     print(' - content: {}'.format(content))
@@ -168,6 +176,9 @@ def record_delete(secretapikey, apikey, domain, id):
     api.delete_record(domain, id, secretapikey, apikey)
     print('Record deleted.')
 
+def list_all(secretapikey, apikey):
+    print('Getting domain list')
+    api.list_all(secretapikey, apikey)
 
 def record(secretapikey, apikey, args):
     id = args['<id>']
@@ -202,11 +213,12 @@ def run(args):
         apikey = load_file(args['--apikey'])
         if args['ping']:
             ping(secretapikey, apikey)
-        else:
+        elif args['record']:
             record(secretapikey, apikey, args)
+        else:
+            list_all(secretapikey, apikey)
     elif args['show_ip']:
         print(get_external_ip())
-
 
 if __name__ == '__main__':
     run(docopt.docopt(__doc__))
